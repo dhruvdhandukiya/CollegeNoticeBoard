@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "174103157478",
+    "project_id": "collegenoticeboard-49628",
+    "storage_bucket": "collegenoticeboard-49628.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:174103157478:android:76551465f484f81b39f927",
+        "android_client_info": {
+          "package_name": "com.college.noticeboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVFbRbffG0IeZAJu8qBR6MzOkUEuuzr1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:174103157478:android:4e322a7ad9806cfa39f927",
+        "android_client_info": {
+          "package_name": "com.example.notice_board_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVFbRbffG0IeZAJu8qBR6MzOkUEuuzr1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
