@@ -1,1 +1,30 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"collegenoticeboard-49628","appId":"1:174103157478:android:4e322a7ad9806cfa39f927","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"collegenoticeboard-49628","configurations":{"android":"1:174103157478:android:4e322a7ad9806cfa39f927","web":"1:174103157478:web:135ff096dbca79f039f927"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "collegenoticeboard-49628",
+          "appId": "1:174103157478:android:4e322a7ad9806cfa39f927",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "collegenoticeboard-49628",
+          "configurations": {
+            "android": "1:174103157478:android:4e322a7ad9806cfa39f927",
+            "web": "1:174103157478:web:135ff096dbca79f039f927"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

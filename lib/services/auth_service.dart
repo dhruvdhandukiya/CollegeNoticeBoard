@@ -1,39 +1,66 @@
-// lib/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 
 class AuthService {
   final _auth = FirebaseAuth.instance;
-  final _db = FirebaseFirestore.instance;
+  final _db   = FirebaseFirestore.instance;
 
-  // ── Current user stream ───────────────────────────────────────────────────
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
-  User? get currentUser => _auth.currentUser;
+  User? get currentFirebaseUser => _auth.currentUser;
 
-  // ── Sign In ───────────────────────────────────────────────────────────────
+  Stream<User?> get authStream => _auth.authStateChanges();
+
+  /// Sign in and return UserModel with role from Firestore
   Future<UserModel?> signIn(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
-      email: email, password: password,
-    );
-    return _fetchUserModel(cred.user!.uid);
+      email: email, password: password);
+    final doc = await _db
+      .collection('users').doc(cred.user!.uid).get();
+    if (!doc.exists) {
+      await _auth.signOut();
+      throw Exception('No profile found. Contact admin.');
+    }
+    return UserModel.fromDoc(doc);
   }
 
-  // ── Sign Out ──────────────────────────────────────────────────────────────
   Future<void> signOut() => _auth.signOut();
 
-  // ── Fetch UserModel ───────────────────────────────────────────────────────
-  Future<UserModel?> _fetchUserModel(String uid) async {
-    final doc = await _db.collection('users').doc(uid).get();
+  Future<UserModel?> getCurrentUser() async {
+    final u = _auth.currentUser;
+    if (u == null) return null;
+    final doc = await _db.collection('users').doc(u.uid).get();
     if (!doc.exists) return null;
     return UserModel.fromDoc(doc);
   }
 
-  Future<UserModel?> getCurrentUserModel() async {
-    if (currentUser == null) return null;
-    return _fetchUserModel(currentUser!.uid);
+  /// Admin creates a student account from the app
+  Future<UserModel> createStudent({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    required String department,
+    required String year,
+    String? committee,
+    String? rollNumber,
+    String? phone,
+  }) async {
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email, password: password);
+    final user = UserModel(
+      uid:        cred.user!.uid,
+      email:      email,
+      name:       name,
+      role:       role,
+      department: department,
+      year:       year,
+      committee:  committee,
+      rollNumber: rollNumber,
+      phone:      phone,
+      isActive:   true,
+      createdAt:  DateTime.now(),
+    );
+    await _db.collection('users').doc(user.uid).set(user.toMap());
+    return user;
   }
 }
-
-// =============================================================================
-

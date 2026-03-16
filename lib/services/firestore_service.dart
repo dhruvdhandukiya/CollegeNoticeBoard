@@ -1,94 +1,282 @@
 // lib/services/firestore_service.dart
+
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/notice_model.dart';
 import '../models/user_model.dart';
 
 class FirestoreService {
-  final _db = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
+  final _db      = FirebaseFirestore.instance;
+  final _storage = FirebaseStorage.instance;
 
   // ══════════════════════════════════════════════════════════════════════════
-  // NOTICE OPERATIONS
+  // USERS
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Add a new notice (admin only)
-  Future<void> addNotice(NoticeModel notice) async {
-    await _db.collection('notices').add(notice.toMap());
+  Future<void> saveStudent(UserModel user) =>
+      _db.collection('users').doc(user.uid).set(user.toMap());
+
+  Future<void> updateStudent(String uid, Map<String, dynamic> data) =>
+      _db.collection('users').doc(uid).update(data);
+
+  Future<void> deactivateStudent(String uid) =>
+      _db.collection('users').doc(uid).update({'isActive': false});
+
+  Future<void> reactivateStudent(String uid) =>
+      _db.collection('users').doc(uid).update({'isActive': true});
+
+  Future<UserModel?> getUserById(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    if (!doc.exists) return null;
+    return UserModel.fromDoc(doc);
   }
 
-  /// Update existing notice (admin only)
-  Future<void> updateNotice(String id, NoticeModel notice) async {
-    await _db.collection('notices').doc(id).update(notice.toMap());
-  }
-
-  /// Delete notice (admin only)
-  Future<void> deleteNotice(String id) async {
-    await _db.collection('notices').doc(id).delete();
-  }
-
-  /// Get ALL notices stream (admin dashboard)
-  Stream<List<NoticeModel>> getAllNotices() {
-    return _db
-      .collection('notices')
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((snap) => snap.docs.map(NoticeModel.fromDoc).toList());
-  }
-
-  /// Get filtered notices for a student
-  /// Logic: show notices where visibility == 'all'
-  ///        OR (visibility == 'department' AND targetDepartment == user.department)
-  ///        OR (visibility == 'committee' AND targetCommittee == user.committee)
-  ///
-  /// NOTE: Firestore doesn't support OR queries well, so we fetch all and filter client-side.
-  Stream<List<NoticeModel>> getFilteredNotices(UserModel user) {
-    return _db
-      .collection('notices')
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((snap) {
-        return snap.docs
-          .map(NoticeModel.fromDoc)
-          .where((n) => _isVisible(n, user))
-          .toList();
-      });
-  }
-
-  bool _isVisible(NoticeModel n, UserModel user) {
-    if (n.visibility == 'all') return true;
-    if (n.visibility == 'department' && n.targetDepartment == user.department) return true;
-    if (n.visibility == 'committee' &&
-        user.committee != null &&
-        n.targetCommittee == user.committee) return true;
-    return false;
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // USER / STUDENT OPERATIONS (Admin)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  /// Add student record to Firestore (called after admin creates auth account)
-  Future<void> addStudentRecord(UserModel user) async {
-    await _db.collection('users').doc(user.uid).set(user.toMap());
-  }
-
-  /// Update student role/dept/committee
-  Future<void> updateStudent(String uid, Map<String, dynamic> data) async {
-    await _db.collection('users').doc(uid).update(data);
-  }
-
-  /// Get all students stream
-  Stream<List<UserModel>> getAllStudents() {
-    return _db
+  Stream<List<UserModel>> getAllStudents() => _db
       .collection('users')
       .where('role', whereNotIn: ['admin'])
+      .where('isActive', isEqualTo: true)
       .snapshots()
-      .map((snap) => snap.docs.map(UserModel.fromDoc).toList());
+      .map((s) => s.docs.map(UserModel.fromDoc).toList()
+        ..sort((a, b) => a.name.compareTo(b.name)));
+
+  Future<List<UserModel>> getAllStudentsOnce() async {
+    final snap = await _db
+        .collection('users')
+        .where('role', whereNotIn: ['admin'])
+        .where('isActive', isEqualTo: true)
+        .get();
+    return snap.docs.map(UserModel.fromDoc).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
   }
 
-  /// Delete a student record
-  Future<void> deleteStudent(String uid) async {
-    await _db.collection('users').doc(uid).delete();
+  Stream<List<UserModel>> getStudentsByDept(String dept) => _db
+      .collection('users')
+      .where('department', isEqualTo: dept)
+      .where('isActive', isEqualTo: true)
+      .snapshots()
+      .map((s) => s.docs.map(UserModel.fromDoc).toList()
+        ..sort((a, b) => a.name.compareTo(b.name)));
+
+  Stream<List<UserModel>> getStudentsByYear(String year) => _db
+      .collection('users')
+      .where('year', isEqualTo: year)
+      .where('isActive', isEqualTo: true)
+      .snapshots()
+      .map((s) => s.docs.map(UserModel.fromDoc).toList()
+        ..sort((a, b) => a.name.compareTo(b.name)));
+
+  Stream<List<UserModel>> getStudentsByDeptAndYear(
+      String dept, String year) => _db
+      .collection('users')
+      .where('department', isEqualTo: dept)
+      .where('year', isEqualTo: year)
+      .where('isActive', isEqualTo: true)
+      .snapshots()
+      .map((s) => s.docs.map(UserModel.fromDoc).toList()
+        ..sort((a, b) => a.name.compareTo(b.name)));
+
+  Future<Map<String, int>> getStudentStats() async {
+    final snap = await _db
+        .collection('users')
+        .where('role', whereNotIn: ['admin'])
+        .where('isActive', isEqualTo: true)
+        .get();
+    final students = snap.docs.map(UserModel.fromDoc).toList();
+    final Map<String, int> stats = {
+      'total': students.length,
+      'IT': 0, 'CS': 0, 'AIDS': 0,
+      'EXTC': 0, 'MECH': 0, 'CHEMICAL': 0,
+      'FE': 0, 'SE': 0, 'TE': 0, 'BE': 0,
+      'committee': 0,
+    };
+    for (final s in students) {
+      stats[s.department] = (stats[s.department] ?? 0) + 1;
+      stats[s.year]       = (stats[s.year] ?? 0) + 1;
+      if (s.role == 'committee') stats['committee'] = stats['committee']! + 1;
+    }
+    return stats;
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NOTICES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Future<void> addNotice(NoticeModel n) =>
+      _db.collection('notices').add(n.toMap());
+
+  Future<void> updateNotice(String id, NoticeModel n) =>
+      _db.collection('notices').doc(id).update(n.toMap());
+
+  Future<void> deleteNotice(String id) =>
+      _db.collection('notices').doc(id).delete();
+
+  Future<void> markNoticeRead(String noticeId, String uid) =>
+      _db.collection('notices').doc(noticeId).update({
+        'readBy': FieldValue.arrayUnion([uid]),
+      });
+
+  // ── USP: Acknowledgement ─────────────────────────────────────────────────
+
+  Future<void> acknowledgeNotice(String noticeId, String uid) =>
+      _db.collection('notices').doc(noticeId).update({
+        'acknowledgedBy': FieldValue.arrayUnion([uid]),
+        'readBy':         FieldValue.arrayUnion([uid]),
+      });
+
+  /// Admin sends in-app nudge to students who haven't acknowledged.
+  /// Writes a nudge document which the student's feed picks up.
+  Future<void> sendNudge(String noticeId, List<String> unreadUids) async {
+    final batch = _db.batch();
+    for (final uid in unreadUids) {
+      final ref = _db.collection('nudges').doc();
+      batch.set(ref, {
+        'noticeId':  noticeId,
+        'targetUid': uid,
+        'createdAt': FieldValue.serverTimestamp(),
+        'seen':      false,
+      });
+    }
+    await batch.commit();
+  }
+
+  /// Stream of unseen nudges for a student
+  Stream<int> nudgeCount(String uid) => _db
+      .collection('nudges')
+      .where('targetUid', isEqualTo: uid)
+      .where('seen', isEqualTo: false)
+      .snapshots()
+      .map((s) => s.docs.length);
+
+  Future<void> markNudgesSeen(String uid) async {
+    final snap = await _db
+        .collection('nudges')
+        .where('targetUid', isEqualTo: uid)
+        .where('seen', isEqualTo: false)
+        .get();
+    final batch = _db.batch();
+    for (final doc in snap.docs) {
+      batch.update(doc.reference, {'seen': true});
+    }
+    await batch.commit();
+  }
+
+  /// Admin — all notices (no expiry filter, includes expired for admin view)
+  Stream<List<NoticeModel>> getAllNotices() => _db
+      .collection('notices')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((s) => s.docs.map(NoticeModel.fromDoc).toList());
+
+  /// Student — notices filtered to profile AND not expired.
+  /// Expired notices are completely hidden.
+  Stream<List<NoticeModel>> getFilteredNotices(UserModel user) => _db
+      .collection('notices')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((s) {
+        final all = s.docs.map(NoticeModel.fromDoc).toList();
+        // Auto-delete notices that are 7 days past their expiry
+        for (final n in all) {
+          if (n.expiresAt != null) {
+            final cutoff = n.expiresAt!.add(const Duration(days: 7));
+            if (DateTime.now().isAfter(cutoff)) {
+              _db.collection('notices').doc(n.id).delete();
+            }
+          }
+        }
+        return all.where((n) {
+          // HIDE expired notices from student feed completely
+          if (n.isExpired) return false;
+          return _isVisible(n, user);
+        }).toList();
+      });
+
+  bool _isVisible(NoticeModel n, UserModel user) {
+    switch (n.visibility) {
+      case 'all':        return true;
+      case 'department': return n.targetDepartment == user.department;
+      case 'year':       return n.targetYear == user.year;
+      case 'committee':  return user.committee != null &&
+          n.targetCommittee == user.committee;
+      case 'specific':   return n.targetStudentUids.contains(user.uid);
+      default:           return false;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ANNOUNCEMENTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Stream<List<Map<String, dynamic>>> getPinnedAnnouncements() => _db
+      .collection('announcements')
+      .where('isPinned', isEqualTo: true)
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+
+  Future<void> addAnnouncement(String text, {bool pinned = true}) =>
+      _db.collection('announcements').add({
+        'text':      text,
+        'isPinned':  pinned,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> deleteAnnouncement(String id) =>
+      _db.collection('announcements').doc(id).delete();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EVENTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Stream<List<Map<String, dynamic>>> getUpcomingEvents() => _db
+      .collection('events')
+      .where('eventDate',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+      .orderBy('eventDate')
+      .limit(20)
+      .snapshots()
+      .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+
+  /// Upload PDF to Firebase Storage and return download URL
+  Future<String?> uploadEventPdf(File file, String eventTitle) async {
+    try {
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${eventTitle.replaceAll(' ', '_')}.pdf';
+      final ref = _storage.ref().child('event_pdfs/$fileName');
+      final task = await ref.putFile(
+        file,
+        SettableMetadata(contentType: 'application/pdf'),
+      );
+      return await task.ref.getDownloadURL();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> addEvent(Map<String, dynamic> event) =>
+      _db.collection('events').add({
+        ...event,
+        'rsvpCount': 0,
+        'rsvpUsers': [],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> updateEvent(String id, Map<String, dynamic> data) =>
+      _db.collection('events').doc(id).update(data);
+
+  Future<void> rsvpEvent(String eventId, String userId) =>
+      _db.collection('events').doc(eventId).update({
+        'rsvpUsers': FieldValue.arrayUnion([userId]),
+        'rsvpCount': FieldValue.increment(1),
+      });
+
+  Future<void> cancelRsvp(String eventId, String userId) =>
+      _db.collection('events').doc(eventId).update({
+        'rsvpUsers': FieldValue.arrayRemove([userId]),
+        'rsvpCount': FieldValue.increment(-1),
+      });
+
+  Future<void> deleteEvent(String id) =>
+      _db.collection('events').doc(id).delete();
 }

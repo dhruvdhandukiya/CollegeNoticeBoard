@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -21,18 +20,15 @@ class CollegeNoticeboardApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<AuthService>(create: (_) => AuthService()),
-        Provider<FirestoreService>(create: (_) => FirestoreService()),
+        Provider(create: (_) => AuthService()),
+        Provider(create: (_) => FirestoreService()),
       ],
       child: MaterialApp(
         title: 'College Noticeboard',
-        theme: AppTheme.theme,
         debugShowCheckedModeBanner: false,
+        theme: AppTheme.theme,
         home: const SplashScreen(),
       ),
     );
   }
 }
-
-// =============================================================================
-

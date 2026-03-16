@@ -12,7 +12,16 @@
           "package_name": "com.college.noticeboard"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "174103157478-0se6c6j9omaaptit81bnm96r64c6tjhp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.college.noticeboard",
+            "certificate_hash": "c5c6d4e2cd74142bf356ea6140fc9b8409defd84"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCVFbRbffG0IeZAJu8qBR6MzOkUEuuzr1k"
