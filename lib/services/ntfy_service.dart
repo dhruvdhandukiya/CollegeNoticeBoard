@@ -39,6 +39,11 @@ class NtfyService {
         iOS: iosSettings,
       );
       await _localNotifications.initialize(settings);
+    } else {
+      // For Web: Request Browser Permission
+      if (html.Notification.supported && html.Notification.permission != 'granted') {
+        await html.Notification.requestPermission();
+      }
     }
     
     _initialized = true;
