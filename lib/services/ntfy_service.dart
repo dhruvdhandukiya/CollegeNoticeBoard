@@ -156,7 +156,7 @@ class NtfyService {
       topics.add('college_committee_${user.committee}');
     }
     
-    return topics.map((t) => t.toLowerCase()).toList();
+    return topics;
   }
 
   /// Send notification for a notice
@@ -238,7 +238,7 @@ class NtfyService {
         break;
     }
     
-    return topics.toSet().map((t) => t.toLowerCase()).toList();
+    return topics.toSet().toList();
   }
 
   /// Convert priority to ntfy priority level
