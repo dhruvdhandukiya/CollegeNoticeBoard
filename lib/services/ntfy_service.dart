@@ -173,12 +173,16 @@ class NtfyService {
       return;
     }
     
+    // Clean the title for HTTP Headers (Browsers reject Non-ASCII in headers)
+    final safeTitle = (notice.isImportant ? 'URGENT: ${notice.title}' : notice.title)
+        .replaceAll(RegExp(r'[^\x00-\x7F]'), '');
+
     for (final topic in topics) {
       try {
         final response = await http.post(
           Uri.parse('$_baseUrl/$topic'),
           headers: {
-            'Title': notice.isImportant ? 'URGENT: ${notice.title}' : notice.title,
+            'Title': safeTitle,
             'Priority': _getPriorityLevel(notice.priority).toString(),
             'Tags': _getTags(notice).join(','),
             'Markdown': 'yes',
