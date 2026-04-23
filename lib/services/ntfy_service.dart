@@ -178,13 +178,17 @@ class NtfyService {
         final response = await http.post(
           Uri.parse('$_baseUrl/$topic'),
           headers: {
-            'Title': notice.isImportant ? '🔴 URGENT: ${notice.title} 🔴' : '📢 ${notice.title} 📢',
+            'Title': notice.isImportant ? 'URGENT: ${notice.title}' : notice.title,
             'Priority': _getPriorityLevel(notice.priority).toString(),
             'Tags': _getTags(notice).join(','),
+            'Markdown': 'yes',
             'Click': 'https://collegenoticeboard-49628.web.app',
             'Actions': 'view, Open App, https://collegenoticeboard-49628.web.app',
           },
-          body: '${notice.description}\n\n${_getTags(notice).map((t) => '#$t').join(' ')}\nView more at: https://collegenoticeboard-49628.web.app',
+          body: '**${notice.title}**\n\n'
+                '${notice.description}\n\n'
+                '${_getTags(notice).map((t) => '#$t').join(' ')}\n'
+                'View more at: https://collegenoticeboard-49628.web.app',
         );
         
         if (response.statusCode == 200) {
