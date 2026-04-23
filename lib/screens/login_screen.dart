@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final user = await context.read<AuthService>().signIn(
-        _emailCtrl.text.trim(),
+        _emailCtrl.text.trim().toLowerCase(),
         _passCtrl.text.trim(),
       );
       if (!mounted) return;
@@ -48,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() => _error = _friendly(e.toString()));
+      debugPrint('Login error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -58,12 +59,18 @@ class _LoginScreenState extends State<LoginScreen> {
         raw.contains('wrong-password') ||
         raw.contains('invalid-credential'))
       return 'Incorrect email or password.';
+    if (raw.contains('invalid-email'))
+      return 'Please enter a valid email address.';
     if (raw.contains('too-many-requests'))
       return 'Too many attempts. Try again later.';
-    if (raw.contains('network'))
-      return 'No internet connection.';
+    if (raw.contains('network') || raw.contains('Network'))
+      return 'No internet connection. Check your network.';
+    if (raw.contains('user-disabled'))
+      return 'Your account has been disabled. Contact admin.';
     if (raw.contains('No profile found'))
       return raw;
+    if (raw.contains('weak-password'))
+      return 'Password must be at least 6 characters.';
     return 'Login failed. Please try again.';
   }
 

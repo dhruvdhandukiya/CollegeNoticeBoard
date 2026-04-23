@@ -1,5 +1,3 @@
-// lib/models/notice_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum NoticePriority { low, medium, high, urgent }
@@ -36,33 +34,26 @@ class NoticeModel {
   final String title;
   final String description;
   final String category;
-
-  // visibility: 'all' | 'department' | 'year' | 'committee' | 'specific'
   final String visibility;
+
   final String? targetDepartment;
   final String? targetYear;
   final String? targetCommittee;
-  final List<String> targetStudentUids; // used when visibility == 'specific'
+  
+  // Multi-select fields (for 'multi' visibility)
+  final List<String> targetDepartments; 
+  final List<String> targetYears;        
+  
+  final List<String> targetStudentUids; 
 
   final bool isImportant;
   final bool isPinned;
   final NoticePriority priority;
 
-  // Auto-expiry — null = never expires.
-  // Once DateTime.now() passes expiresAt, notice is HIDDEN from student feed.
   final DateTime? expiresAt;
-
-  // Read receipts: UIDs of students who opened the notice
   final List<String> readBy;
-
-  // ── USP: Acknowledgement ─────────────────────────────────────────────────
-  // If true, student must tap "I Acknowledge" — appears in their Pending tab.
-  // Admin can see who has/hasn't acknowledged and send nudges.
   final bool requiresAcknowledgement;
-
-  // UIDs of students who have acknowledged
   final List<String> acknowledgedBy;
-
   final DateTime createdAt;
 
   const NoticeModel({
@@ -74,6 +65,8 @@ class NoticeModel {
     this.targetDepartment,
     this.targetYear,
     this.targetCommittee,
+    this.targetDepartments = const [],
+    this.targetYears = const [],
     this.targetStudentUids = const [],
     required this.isImportant,
     this.isPinned = false,
@@ -85,11 +78,8 @@ class NoticeModel {
     required this.createdAt,
   });
 
-  // A notice is expired when current time is past expiresAt
-  bool get isExpired =>
-      expiresAt != null && DateTime.now().isAfter(expiresAt!);
+  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 
-  // Expiring within next 24 hours (show countdown)
   bool get expiringSoon {
     if (expiresAt == null || isExpired) return false;
     return expiresAt!.difference(DateTime.now()).inHours <= 24;
@@ -109,6 +99,8 @@ class NoticeModel {
       targetDepartment: d['targetDepartment'],
       targetYear:       d['targetYear'],
       targetCommittee:  d['targetCommittee'],
+      targetDepartments: List<String>.from(d['targetDepartments'] ?? []),
+      targetYears:       List<String>.from(d['targetYears'] ?? []),
       targetStudentUids: List<String>.from(d['targetStudentUids'] ?? []),
       isImportant:      d['isImportant'] ?? false,
       isPinned:         d['isPinned'] ?? false,
@@ -131,6 +123,8 @@ class NoticeModel {
     'targetDepartment':        targetDepartment,
     'targetYear':              targetYear,
     'targetCommittee':         targetCommittee,
+    'targetDepartments':       targetDepartments,
+    'targetYears':             targetYears,
     'targetStudentUids':       targetStudentUids,
     'isImportant':             isImportant,
     'isPinned':                isPinned,

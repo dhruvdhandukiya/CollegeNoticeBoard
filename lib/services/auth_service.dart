@@ -12,15 +12,48 @@ class AuthService {
 
   /// Sign in and return UserModel with role from Firestore
   Future<UserModel?> signIn(String email, String password) async {
-    final cred = await _auth.signInWithEmailAndPassword(
-      email: email, password: password);
-    final doc = await _db
-      .collection('users').doc(cred.user!.uid).get();
-    if (!doc.exists) {
-      await _auth.signOut();
-      throw Exception('No profile found. Contact admin.');
+    try {
+      // Validate email format
+      if (!_isValidEmail(email)) {
+        throw FirebaseAuthException(
+          code: 'invalid-email',
+          message: 'Please enter a valid email address',
+        );
+      }
+
+      // Validate password
+      if (password.isEmpty || password.length < 6) {
+        throw FirebaseAuthException(
+          code: 'weak-password',
+          message: 'Password must be at least 6 characters',
+        );
+      }
+
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+
+      final doc = await _db
+        .collection('users').doc(cred.user!.uid).get();
+
+      if (!doc.exists) {
+        await _auth.signOut();
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'No profile found. Contact admin.',
+        );
+      }
+
+      return UserModel.fromDoc(doc);
+    } on FirebaseAuthException {
+      rethrow;
+    } catch (e) {
+      throw FirebaseAuthException(
+        code: 'unknown-error',
+        message: e.toString(),
+      );
     }
-    return UserModel.fromDoc(doc);
   }
 
   Future<void> signOut() => _auth.signOut();
@@ -45,11 +78,28 @@ class AuthService {
     String? rollNumber,
     String? phone,
   }) async {
+    if (!_isValidEmail(email)) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Please enter a valid email address',
+      );
+    }
+
+    if (password.length < 6) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: 'Password must be at least 6 characters',
+      );
+    }
+
     final cred = await _auth.createUserWithEmailAndPassword(
-      email: email, password: password);
+      email: email.trim().toLowerCase(),
+      password: password,
+    );
+
     final user = UserModel(
       uid:        cred.user!.uid,
-      email:      email,
+      email:      email.trim().toLowerCase(),
       name:       name,
       role:       role,
       department: department,
@@ -60,7 +110,16 @@ class AuthService {
       isActive:   true,
       createdAt:  DateTime.now(),
     );
+
     await _db.collection('users').doc(user.uid).set(user.toMap());
     return user;
+  }
+
+  /// Helper method to validate email
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    return emailRegex.hasMatch(email.trim());
   }
 }

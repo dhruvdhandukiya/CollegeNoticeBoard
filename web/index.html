@@ -4,33 +4,84 @@
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-  
-  <!-- 🔴 GOOGLE SIGN-IN CONFIGURATION -->
-  <meta name="google-signin-client_id" content="174103157478-fh80l432rsdqj5ph3dpvgpt686umpenb.apps.googleusercontent.com">
-  <meta name="google-signin-use_fedcm" content="false">
-  
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="notice_board_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>notice_board_app</title>
-  <link rel="manifest" href="manifest.json">
+  <meta name="description" content="College Noticeboard App">
+  <title>College Noticeboard</title>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <script>
+    window.gCalToken     = null;
+    window.gCalExpiry    = null;
+
+    window.requestCalendarToken = function(clientId, callback) {
+      console.log('GIS: requestCalendarToken called with clientId:', clientId);
+
+      if (!clientId || clientId !== '174103157478-fh80l432rsdqj5ph3dpvgpt686umpenb.apps.googleusercontent.com') {
+        console.error('GIS: Invalid client ID! Update _webClientId in calendar_service.dart');
+        callback('error: invalid client ID - update _webClientId in calendar_service.dart');
+        return;
+      }
+
+      try {
+        var tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar.events',
+          callback: function(response) {
+            console.log('GIS callback response:', response);
+            if (response && response.access_token) {
+              window.gCalToken  = response.access_token;
+              window.gCalExpiry = Date.now() + 3500000; // ~58 min
+              console.log('GIS: token stored successfully');
+              callback('ok');
+            } else if (response && response.error) {
+              console.error('GIS error:', response.error);
+              callback('error: ' + response.error);
+            } else {
+              console.error('GIS: unknown response', response);
+              callback('error: unknown response');
+            }
+          },
+          error_callback: function(err) {
+            console.error('GIS error_callback:', err);
+            // popup_closed is when user closes the popup — not a hard error
+            if (err && err.type === 'popup_closed') {
+              callback('error: popup_closed_by_user');
+            } else {
+              callback('error: ' + (err ? JSON.stringify(err) : 'unknown'));
+            }
+          }
+        });
+
+        // Open the consent popup
+        tokenClient.requestAccessToken({ prompt: '' });
+
+      } catch(e) {
+        console.error('GIS exception:', e);
+        callback('exception: ' + e.toString());
+      }
+    };
+
+    /** Called from Dart to read the stored token */
+    window.getCalendarToken = function() {
+      if (!window.gCalToken)  return null;
+      if (!window.gCalExpiry) return null;
+      if (Date.now() > window.gCalExpiry) {
+        window.gCalToken  = null;
+        window.gCalExpiry = null;
+        return null;
+      }
+      return window.gCalToken;
+    };
+
+    /** Called from Dart on sign-out */
+    window.clearCalendarToken = function() {
+      window.gCalToken  = null;
+      window.gCalExpiry = null;
+      console.log('GIS: token cleared');
+    };
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

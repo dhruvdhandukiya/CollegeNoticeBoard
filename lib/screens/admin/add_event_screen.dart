@@ -1,9 +1,6 @@
-// lib/screens/admin/add_event_screen.dart
-
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../../services/firestore_service.dart';
 import '../../utils/app_theme.dart';
@@ -25,10 +22,6 @@ class _AddEventScreenState extends State<AddEventScreen> {
   DateTime? _eventDate;
   TimeOfDay? _eventTime;
   String _category = 'Technical';
-  File? _pdfFile;
-  String? _existingPdfUrl;
-  String? _pdfFileName;
-  bool _uploading = false;
   bool _submitting = false;
 
   static const _categories = [
@@ -46,7 +39,6 @@ class _AddEventScreenState extends State<AddEventScreen> {
       _organizerCtrl.text = e['organizer'] ?? '';
       _descCtrl.text      = e['description'] ?? '';
       _category           = e['category'] ?? 'Technical';
-      _existingPdfUrl     = e['pdfUrl'];
       if (e['eventDate'] != null) {
         _eventDate = (e['eventDate'] as dynamic).toDate();
         _eventTime = TimeOfDay(
@@ -82,19 +74,6 @@ class _AddEventScreenState extends State<AddEventScreen> {
     if (t != null) setState(() => _eventTime = t);
   }
 
-  Future<void> _pickPdf() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-    );
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _pdfFile     = File(result.files.single.path!);
-        _pdfFileName = result.files.single.name;
-      });
-    }
-  }
-
   DateTime? get _fullEventDate {
     if (_eventDate == null) return null;
     final t = _eventTime ?? const TimeOfDay(hour: 10, minute: 0);
@@ -115,22 +94,14 @@ class _AddEventScreenState extends State<AddEventScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_fullEventDate == null) {
-      _snack('Pick a date and time for the event'); return;
+      _snack('Pick a date and time for the event'); 
+      return;
     }
+    
     setState(() => _submitting = true);
+    
     try {
       final fs = context.read<FirestoreService>();
-
-      // Upload PDF if selected
-      String? pdfUrl = _existingPdfUrl;
-      if (_pdfFile != null) {
-        setState(() => _uploading = true);
-        pdfUrl = await fs.uploadEventPdf(_pdfFile!, _titleCtrl.text.trim());
-        setState(() => _uploading = false);
-        if (pdfUrl == null) {
-          _snack('PDF upload failed. Event saved without PDF.');
-        }
-      }
 
       final data = {
         'title':     _titleCtrl.text.trim(),
@@ -139,8 +110,6 @@ class _AddEventScreenState extends State<AddEventScreen> {
         'description': _descCtrl.text.trim(),
         'category':  _category,
         'eventDate': _fullEventDate,
-        if (pdfUrl != null) 'pdfUrl': pdfUrl,
-        if (_pdfFileName != null) 'pdfName': _pdfFileName,
       };
 
       if (widget.existing != null) {
@@ -172,10 +141,10 @@ class _AddEventScreenState extends State<AddEventScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-
-            // ── Details ───────────────────────────────────────────────────
             _label('Event Details'),
             const SizedBox(height: 10),
+            
+            // Title
             TextFormField(
               controller: _titleCtrl,
               textCapitalization: TextCapitalization.sentences,
@@ -184,6 +153,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 12),
+            
+            // Venue
             TextFormField(
               controller: _venueCtrl,
               decoration: const InputDecoration(
@@ -194,6 +165,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 12),
+            
+            // Organizer
             TextFormField(
               controller: _organizerCtrl,
               decoration: const InputDecoration(
@@ -202,6 +175,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
                     color: AppTheme.textMuted)),
             ),
             const SizedBox(height: 12),
+            
+            // Description
             TextFormField(
               controller: _descCtrl,
               maxLines: 4,
@@ -212,7 +187,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
             ),
             const SizedBox(height: 22),
 
-            // ── Category ──────────────────────────────────────────────────
+            // Category
             _label('Category'),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8,
@@ -235,7 +210,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
               }).toList()),
             const SizedBox(height: 22),
 
-            // ── Date & Time ───────────────────────────────────────────────
+            // Date & Time
             _label('Date & Time *'),
             const SizedBox(height: 10),
             Row(children: [
@@ -257,73 +232,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
                 filled: _eventTime != null,
               )),
             ]),
-            const SizedBox(height: 22),
-
-            // ── PDF Upload ────────────────────────────────────────────────
-            _label('Attach PDF (Optional)'),
-            const SizedBox(height: 6),
-            Text('Upload event brochure, schedule, or circular.',
-                style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: _pickPdf,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: (_pdfFile != null || _existingPdfUrl != null)
-                        ? AppTheme.success : const Color(0xFFDDE3F0),
-                    width: 1.5,
-                    style: BorderStyle.solid)),
-                child: Row(children: [
-                  Icon(
-                    (_pdfFile != null || _existingPdfUrl != null)
-                        ? Icons.picture_as_pdf_rounded
-                        : Icons.upload_file_rounded,
-                    color: (_pdfFile != null || _existingPdfUrl != null)
-                        ? AppTheme.danger : AppTheme.textMuted,
-                    size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _pdfFileName ??
-                        (_existingPdfUrl != null
-                            ? 'PDF already attached'
-                            : 'Tap to upload PDF'),
-                        style: AppTheme.body.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: (_pdfFile != null || _existingPdfUrl != null)
-                              ? AppTheme.textDark : AppTheme.textMuted)),
-                      if (_pdfFile == null && _existingPdfUrl == null)
-                        Text('Max 10 MB · PDF only',
-                            style: AppTheme.bodyMuted.copyWith(fontSize: 11)),
-                    ],
-                  )),
-                  if (_pdfFile != null)
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: AppTheme.danger, size: 18),
-                      onPressed: () => setState(() {
-                        _pdfFile = null;
-                        _pdfFileName = null;
-                      }),
-                    ),
-                ]),
-              ),
-            ),
-            if (_uploading) ...[
-              const SizedBox(height: 8),
-              const LinearProgressIndicator(),
-              const SizedBox(height: 4),
-              Text('Uploading PDF…',
-                  style: AppTheme.bodyMuted.copyWith(fontSize: 12)),
-            ],
-
             const SizedBox(height: 32),
+
+            // Submit Button
             ElevatedButton.icon(
               onPressed: _submitting ? null : _submit,
               icon: _submitting
@@ -335,7 +246,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   : widget.existing != null
                       ? 'Update Event' : 'Create Event'),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accent),
+                  backgroundColor: AppTheme.accent,
+                  minimumSize: const Size(double.infinity, 48)),
             ),
             const SizedBox(height: 24),
           ],

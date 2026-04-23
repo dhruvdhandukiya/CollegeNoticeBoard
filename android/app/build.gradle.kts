@@ -24,7 +24,7 @@ android {
         applicationId = "com.example.notice_board_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 21  // ✅ FIXED: Explicitly set to 21 (FCM requires minimum 21)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -37,14 +37,18 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-    buildscript {
-    dependencies {
-    classpath 'com.google.gms:google-services:4.4.1'
-  }
-}
 }
 
 flutter {
     source = "../.."
 }
+
+// ✅ MOVED buildscript outside android block
+buildscript {
+    dependencies {
+        classpath 'com.google.gms:google-services:4.4.1'
+    }
+}
+
+// ✅ Apply Google Services plugin at the end
 apply plugin: 'com.google.gms.google-services'

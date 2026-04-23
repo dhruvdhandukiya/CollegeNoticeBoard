@@ -1,13 +1,14 @@
 // lib/services/firestore_service.dart
 
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/notice_model.dart';
 import '../models/user_model.dart';
 
 class FirestoreService {
-  final _db      = FirebaseFirestore.instance;
+  final _db = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -41,13 +42,20 @@ class FirestoreService {
         ..sort((a, b) => a.name.compareTo(b.name)));
 
   Future<List<UserModel>> getAllStudentsOnce() async {
+    // Get all active users first
     final snap = await _db
         .collection('users')
-        .where('role', whereNotIn: ['admin'])
         .where('isActive', isEqualTo: true)
         .get();
-    return snap.docs.map(UserModel.fromDoc).toList()
+    
+    // Filter out admins manually (more reliable than whereNotIn)
+    final students = snap.docs
+        .map(UserModel.fromDoc)
+        .where((user) => user.role != 'admin')
+        .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
+    
+    return students;
   }
 
   Stream<List<UserModel>> getStudentsByDept(String dept) => _db
@@ -66,15 +74,15 @@ class FirestoreService {
       .map((s) => s.docs.map(UserModel.fromDoc).toList()
         ..sort((a, b) => a.name.compareTo(b.name)));
 
-  Stream<List<UserModel>> getStudentsByDeptAndYear(
-      String dept, String year) => _db
-      .collection('users')
-      .where('department', isEqualTo: dept)
-      .where('year', isEqualTo: year)
-      .where('isActive', isEqualTo: true)
-      .snapshots()
-      .map((s) => s.docs.map(UserModel.fromDoc).toList()
-        ..sort((a, b) => a.name.compareTo(b.name)));
+  Stream<List<UserModel>> getStudentsByDeptAndYear(String dept, String year) =>
+      _db
+          .collection('users')
+          .where('department', isEqualTo: dept)
+          .where('year', isEqualTo: year)
+          .where('isActive', isEqualTo: true)
+          .snapshots()
+          .map((s) => s.docs.map(UserModel.fromDoc).toList()
+            ..sort((a, b) => a.name.compareTo(b.name)));
 
   Future<Map<String, int>> getStudentStats() async {
     final snap = await _db
@@ -85,14 +93,21 @@ class FirestoreService {
     final students = snap.docs.map(UserModel.fromDoc).toList();
     final Map<String, int> stats = {
       'total': students.length,
-      'IT': 0, 'CS': 0, 'AIDS': 0,
-      'EXTC': 0, 'MECH': 0, 'CHEMICAL': 0,
-      'FE': 0, 'SE': 0, 'TE': 0, 'BE': 0,
+      'IT': 0,
+      'CS': 0,
+      'AIDS': 0,
+      'EXTC': 0,
+      'MECH': 0,
+      'CHEMICAL': 0,
+      'FE': 0,
+      'SE': 0,
+      'TE': 0,
+      'BE': 0,
       'committee': 0,
     };
     for (final s in students) {
       stats[s.department] = (stats[s.department] ?? 0) + 1;
-      stats[s.year]       = (stats[s.year] ?? 0) + 1;
+      stats[s.year] = (stats[s.year] ?? 0) + 1;
       if (s.role == 'committee') stats['committee'] = stats['committee']! + 1;
     }
     return stats;
@@ -111,30 +126,34 @@ class FirestoreService {
   Future<void> deleteNotice(String id) =>
       _db.collection('notices').doc(id).delete();
 
-  Future<void> markNoticeRead(String noticeId, String uid) =>
-      _db.collection('notices').doc(noticeId).update({
+  Future<void> markNoticeRead(String noticeId, String uid) async {
+    try {
+      await _db.collection('notices').doc(noticeId).update({
         'readBy': FieldValue.arrayUnion([uid]),
       });
-
-  // ── USP: Acknowledgement ─────────────────────────────────────────────────
+    } catch (e) {
+      // If document doesn't have readBy field, create it
+      await _db.collection('notices').doc(noticeId).set({
+        'readBy': [uid],
+      }, SetOptions(merge: true));
+    }
+  }
 
   Future<void> acknowledgeNotice(String noticeId, String uid) =>
       _db.collection('notices').doc(noticeId).update({
         'acknowledgedBy': FieldValue.arrayUnion([uid]),
-        'readBy':         FieldValue.arrayUnion([uid]),
+        'readBy': FieldValue.arrayUnion([uid]),
       });
 
-  /// Admin sends in-app nudge to students who haven't acknowledged.
-  /// Writes a nudge document which the student's feed picks up.
   Future<void> sendNudge(String noticeId, List<String> unreadUids) async {
     final batch = _db.batch();
     for (final uid in unreadUids) {
       final ref = _db.collection('nudges').doc();
       batch.set(ref, {
-        'noticeId':  noticeId,
+        'noticeId': noticeId,
         'targetUid': uid,
         'createdAt': FieldValue.serverTimestamp(),
-        'seen':      false,
+        'seen': false,
       });
     }
     await batch.commit();
@@ -169,7 +188,6 @@ class FirestoreService {
       .map((s) => s.docs.map(NoticeModel.fromDoc).toList());
 
   /// Student — notices filtered to profile AND not expired.
-  /// Expired notices are completely hidden.
   Stream<List<NoticeModel>> getFilteredNotices(UserModel user) => _db
       .collection('notices')
       .orderBy('createdAt', descending: true)
@@ -186,7 +204,6 @@ class FirestoreService {
           }
         }
         return all.where((n) {
-          // HIDE expired notices from student feed completely
           if (n.isExpired) return false;
           return _isVisible(n, user);
         }).toList();
@@ -194,13 +211,24 @@ class FirestoreService {
 
   bool _isVisible(NoticeModel n, UserModel user) {
     switch (n.visibility) {
-      case 'all':        return true;
-      case 'department': return n.targetDepartment == user.department;
-      case 'year':       return n.targetYear == user.year;
-      case 'committee':  return user.committee != null &&
-          n.targetCommittee == user.committee;
-      case 'specific':   return n.targetStudentUids.contains(user.uid);
-      default:           return false;
+      case 'all':
+        return true;
+      case 'multi':
+        final deptMatch = n.targetDepartments.isEmpty ||
+            n.targetDepartments.contains(user.department);
+        final yearMatch = n.targetYears.isEmpty ||
+            n.targetYears.contains(user.year);
+        return deptMatch || yearMatch;
+      case 'department':
+        return n.targetDepartment == user.department;
+      case 'year':
+        return n.targetYear == user.year;
+      case 'committee':
+        return user.committee != null && n.targetCommittee == user.committee;
+      case 'specific':
+        return n.targetStudentUids.contains(user.uid);
+      default:
+        return false;
     }
   }
 
@@ -217,8 +245,8 @@ class FirestoreService {
 
   Future<void> addAnnouncement(String text, {bool pinned = true}) =>
       _db.collection('announcements').add({
-        'text':      text,
-        'isPinned':  pinned,
+        'text': text,
+        'isPinned': pinned,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -238,17 +266,32 @@ class FirestoreService {
       .snapshots()
       .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
 
-  /// Upload PDF to Firebase Storage and return download URL
-  Future<String?> uploadEventPdf(File file, String eventTitle) async {
+  Future<String?> uploadEventPdf(dynamic pdfData, String fileName) async {
     try {
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${eventTitle.replaceAll(' ', '_')}.pdf';
-      final ref = _storage.ref().child('event_pdfs/$fileName');
-      final task = await ref.putFile(
-        file,
-        SettableMetadata(contentType: 'application/pdf'),
-      );
-      return await task.ref.getDownloadURL();
+      final safeFileName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final storageRef = _storage
+          .ref()
+          .child('event_pdfs')
+          .child('${DateTime.now().millisecondsSinceEpoch}_$safeFileName');
+
+      if (pdfData is Uint8List) {
+        await storageRef.putData(
+            pdfData,
+            SettableMetadata(
+              contentType: 'application/pdf',
+            ));
+      } else if (pdfData is File) {
+        await storageRef.putFile(
+            pdfData,
+            SettableMetadata(
+              contentType: 'application/pdf',
+            ));
+      } else {
+        return null;
+      }
+
+      final downloadUrl = await storageRef.getDownloadURL();
+      return downloadUrl;
     } catch (e) {
       return null;
     }

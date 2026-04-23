@@ -4,12 +4,18 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/firestore_service.dart';
+import 'services/ntfy_service.dart';
 import 'utils/app_theme.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform);
+  
+  // Initialize ntfy service
+  await NtfyService().init();
+
   runApp(const CollegeNoticeboardApp());
 }
 
@@ -22,6 +28,7 @@ class CollegeNoticeboardApp extends StatelessWidget {
       providers: [
         Provider(create: (_) => AuthService()),
         Provider(create: (_) => FirestoreService()),
+        Provider(create: (_) => NtfyService()),
       ],
       child: MaterialApp(
         title: 'College Noticeboard',

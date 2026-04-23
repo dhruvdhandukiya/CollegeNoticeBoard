@@ -56,53 +56,116 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   void _showStats() async {
     final stats = await context.read<FirestoreService>().getStudentStats();
     if (!mounted) return;
+    
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Student Statistics', style: AppTheme.heading2),
-            const SizedBox(height: 16),
-            _statRow('Total Students', stats['total'] ?? 0),
-            const Divider(),
-            Text('By Department', style: AppTheme.heading3),
-            for (final d in ['IT','CS','EXTC','MECH','AIDS','CHEMICAL'])
-              _statRow(d, stats[d] ?? 0, color: AppTheme.deptColor(d)),
-            const Divider(),
-            Text('By Year', style: AppTheme.heading3),
-            for (final y in ['FE','SE','TE','BE'])
-              _statRow(y, stats[y] ?? 0, color: AppTheme.yearColor(y)),
-            const Divider(),
-            _statRow('Committee Members', stats['committee'] ?? 0,
-                color: AppTheme.purple),
-            const SizedBox(height: 12),
-          ],
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Title
+              Text('Student Statistics', style: AppTheme.heading2),
+              const SizedBox(height: 16),
+              
+              // Scrollable content
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  children: [
+                    _statRow('Total Students', stats['total'] ?? 0),
+                    const Divider(),
+                    
+                    Text('By Department', style: AppTheme.heading3),
+                    const SizedBox(height: 8),
+                    ...['IT', 'CS', 'EXTC', 'MECH', 'AIDS', 'CHEMICAL'].map((d) => 
+                      _statRow(d, stats[d] ?? 0, color: AppTheme.deptColor(d))
+                    ).toList(),
+                    
+                    const Divider(),
+                    Text('By Year', style: AppTheme.heading3),
+                    const SizedBox(height: 8),
+                    ...['FE', 'SE', 'TE', 'BE'].map((y) => 
+                      _statRow(y, stats[y] ?? 0, color: AppTheme.yearColor(y))
+                    ).toList(),
+                    
+                    const Divider(),
+                    _statRow('Committee Members', stats['committee'] ?? 0,
+                        color: AppTheme.purple),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _statRow(String label, int count, {Color? color}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(children: [
-      if (color != null) ...[
-        Container(width: 10, height: 10,
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (color != null) ...[
+          Container(
+            width: 10, 
+            height: 10,
             decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 8),
+              color: color,
+              borderRadius: BorderRadius.circular(3)
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: AppTheme.body,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: (color ?? AppTheme.primary).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            count.toString(),
+            style: AppTheme.heading3.copyWith(
+              color: color ?? AppTheme.primary,
+              fontSize: 14,
+            ),
+          ),
+        ),
       ],
-      Text(label, style: AppTheme.body),
-      const Spacer(),
-      Text(count.toString(),
-          style: AppTheme.heading3.copyWith(
-              color: color ?? AppTheme.primary)),
-    ]),
+    ),
   );
 
   Stream<List<UserModel>> get _studentsStream {
@@ -288,8 +351,26 @@ class _StudentsTab extends StatelessWidget {
       Expanded(child: StreamBuilder<List<UserModel>>(
         stream: stream,
         builder: (ctx, snap) {
-          if (!snap.hasData) return const Center(
-              child: CircularProgressIndicator());
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
+                  const SizedBox(height: 16),
+                  Text('Error loading students', style: AppTheme.heading3),
+                ],
+              ),
+            );
+          }
+          if (!snap.hasData || snap.data!.isEmpty) {
+            return Center(
+              child: Text('No students found',
+                  style: AppTheme.bodyMuted));
+          }
           var students = snap.data!;
           if (searchQuery.isNotEmpty) {
             final q = searchQuery.toLowerCase();
@@ -300,7 +381,7 @@ class _StudentsTab extends StatelessWidget {
             ).toList();
           }
           if (students.isEmpty) return Center(
-              child: Text('No students found',
+              child: Text('No students match your search',
                   style: AppTheme.bodyMuted));
           return Column(children: [
             Padding(
@@ -361,19 +442,48 @@ class _StudentCard extends StatelessWidget {
           onSelected: (v) async {
             final fs = context.read<FirestoreService>();
             if (v == 'deactivate') {
-              await fs.deactivateStudent(s.uid);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${s.name} deactivated'),
-                    backgroundColor: AppTheme.danger,
-                    behavior: SnackBarBehavior.floating));
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: Text('Deactivate ${s.name}?'),
+                  content: const Text('This student will no longer be able to log in.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.danger),
+                      child: const Text('Deactivate'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await fs.deactivateStudent(s.uid);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${s.name} deactivated'),
+                      backgroundColor: AppTheme.success,
+                      behavior: SnackBarBehavior.floating));
+                }
               }
             }
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: 'deactivate',
-                child: Text('Deactivate')),
+            const PopupMenuItem(
+              value: 'deactivate',
+              child: Row(
+                children: [
+                  Icon(Icons.block_rounded, size: 18, color: AppTheme.danger),
+                  SizedBox(width: 8),
+                  Text('Deactivate'),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -390,12 +500,27 @@ class _NoticesTab extends StatelessWidget {
     return StreamBuilder<List<NoticeModel>>(
       stream: fs.getAllNotices(),
       builder: (_, snap) {
-        if (!snap.hasData) return const Center(
-            child: CircularProgressIndicator());
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
+                const SizedBox(height: 16),
+                Text('Error loading notices', style: AppTheme.heading3),
+              ],
+            ),
+          );
+        }
+        if (!snap.hasData || snap.data!.isEmpty) {
+          return Center(
+              child: Text('No notices yet',
+                  style: AppTheme.bodyMuted));
+        }
         final notices = snap.data!;
-        if (notices.isEmpty) return Center(
-            child: Text('No notices yet',
-                style: AppTheme.bodyMuted));
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
           itemCount: notices.length,
@@ -505,6 +630,13 @@ class _AdminNoticeCard extends StatelessWidget {
                       );
                       if (ok == true) {
                         await fs.deleteNotice(notice.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Notice deleted'),
+                              backgroundColor: AppTheme.success,
+                              behavior: SnackBarBehavior.floating));
+                        }
                       }
                     },
                     icon: const Icon(Icons.delete_outline_rounded,
@@ -551,8 +683,21 @@ class _EventsTab extends StatelessWidget {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: fs.getUpcomingEvents(),
       builder: (_, snap) {
-        if (!snap.hasData) return const Center(
-            child: CircularProgressIndicator());
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
+                const SizedBox(height: 16),
+                Text('Error loading events', style: AppTheme.heading3),
+              ],
+            ),
+          );
+        }
         final events = snap.data!;
         if (events.isEmpty) return Center(
             child: Text('No events yet',
@@ -595,7 +740,37 @@ class _EventsTab extends StatelessWidget {
                 trailing: IconButton(
                   icon: const Icon(Icons.delete_outline_rounded,
                       color: AppTheme.danger),
-                  onPressed: () => fs.deleteEvent(e['id']),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete Event'),
+                        content: Text('Delete "${e['title']}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.danger),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await fs.deleteEvent(e['id']);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Event deleted'),
+                            backgroundColor: AppTheme.success,
+                            behavior: SnackBarBehavior.floating));
+                      }
+                    }
+                  },
                 ),
               ),
             );
