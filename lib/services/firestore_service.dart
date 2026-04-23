@@ -218,7 +218,7 @@ class FirestoreService {
             n.targetDepartments.contains(user.department);
         final yearMatch = n.targetYears.isEmpty ||
             n.targetYears.contains(user.year);
-        return deptMatch || yearMatch;
+        return deptMatch && yearMatch;
       case 'department':
         return n.targetDepartment == user.department;
       case 'year':

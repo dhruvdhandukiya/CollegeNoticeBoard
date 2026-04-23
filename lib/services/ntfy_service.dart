@@ -203,16 +203,19 @@ class NtfyService {
         break;
         
       case 'multi':
-        for (final dept in notice.targetDepartments) {
-          for (final year in notice.targetYears) {
-            topics.add('college_${dept}_${year}');
+        if (notice.targetDepartments.isNotEmpty && notice.targetYears.isNotEmpty) {
+          for (final dept in notice.targetDepartments) {
+            for (final year in notice.targetYears) {
+              topics.add('college_${dept}_${year}');
+            }
           }
-        }
-        for (final dept in notice.targetDepartments) {
-          topics.add('college_dept_$dept');
-        }
-        for (final year in notice.targetYears) {
-          topics.add('college_year_$year');
+        } else {
+          for (final dept in notice.targetDepartments) {
+            topics.add('college_dept_$dept');
+          }
+          for (final year in notice.targetYears) {
+            topics.add('college_year_$year');
+          }
         }
         break;
         
