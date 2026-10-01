@@ -1,5 +1,6 @@
 # 🎓 College Noticeboard — Smart Notice Intelligence & Event Management
 
+[![Live Demo](https://img.shields.io/badge/Live_App-collegenoticeboard--49628.web.app-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white)](https://collegenoticeboard-49628.web.app)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.0+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Backend-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
@@ -10,10 +11,13 @@
 
 > **A Next-Generation, Role-Based College Noticeboard System** built with Flutter, Firebase, ntfy.sh, and Google Calendar. Features multi-tier notice targeting, real-time push alerts via Server-Sent Events (SSE), notice read-receipt analytics, one-tap student nudging, and automated calendar event sync.
 
+🌐 **Live Web Application**: [https://collegenoticeboard-49628.web.app](https://collegenoticeboard-49628.web.app)
+
 ---
 
 ## 📌 Table of Contents
 
+- [🌐 Live Application](#-live-application)
 - [✨ Key Features](#-key-features)
 - [🏗️ System Architecture](#️-system-architecture)
 - [👥 User Roles & Workflow](#-user-roles--workflow)
@@ -25,6 +29,13 @@
 - [🌐 Web Platform & Firebase Configuration](#-web-platform--firebase-configuration)
 - [📝 Latest Changelog & Commit History](#-latest-changelog--commit-history)
 - [🤝 Contributing & License](#-contributing--license)
+
+---
+
+## 🌐 Live Application
+
+Access the live deployed web version directly:
+👉 **[https://collegenoticeboard-49628.web.app](https://collegenoticeboard-49628.web.app)**
 
 ---
 
@@ -369,7 +380,3 @@ For web hosting and local browser testing, verify the following configuration in
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-**Developed with ❤️ for Colleges and Academic Institutions.**
