@@ -1,6 +1,3 @@
-// lib/screens/admin/admin_dashboard_screen.dart
-// Seed Database option removed. Read receipt count shown on each notice.
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
